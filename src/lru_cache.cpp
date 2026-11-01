@@ -7,6 +7,8 @@ void LRUCache::put(const std::string& key, const std::string& value) {
         return;
     }
 
+    std::lock_guard<std::mutex> lock(mutex_);
+
     auto it = index_.find(key);
     if (it != index_.end()) {
         it->second->second = value;
@@ -24,6 +26,8 @@ void LRUCache::put(const std::string& key, const std::string& value) {
 }
 
 std::optional<std::string> LRUCache::get(const std::string& key) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     auto it = index_.find(key);
     if (it == index_.end()) {
         return std::nullopt;
@@ -34,6 +38,8 @@ std::optional<std::string> LRUCache::get(const std::string& key) {
 }
 
 bool LRUCache::remove(const std::string& key) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     auto it = index_.find(key);
     if (it == index_.end()) {
         return false;
@@ -45,14 +51,17 @@ bool LRUCache::remove(const std::string& key) {
 }
 
 bool LRUCache::contains(const std::string& key) const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return index_.find(key) != index_.end();
 }
 
 std::size_t LRUCache::size() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return usageOrder_.size();
 }
 
 void LRUCache::clear() {
+    std::lock_guard<std::mutex> lock(mutex_);
     usageOrder_.clear();
     index_.clear();
 }
