@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cstddef>
+#include <list>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 class LRUCache {
 public:
@@ -15,6 +17,12 @@ public:
     std::size_t capacity() const;
 
 private:
+    using Entry = std::pair<std::string, std::string>;
+    using EntryList = std::list<Entry>;
+
+    void evictLeastRecentlyUsed();
+
     std::size_t capacity_;
-    std::unordered_map<std::string, std::string> entries_;
+    EntryList usageOrder_;
+    std::unordered_map<std::string, EntryList::iterator> index_;
 };

@@ -1,3 +1,4 @@
 build/
 .cache/
+.claude/
 compile_commands.json

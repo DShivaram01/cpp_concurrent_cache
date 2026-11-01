@@ -53,6 +53,88 @@ TEST(LRUCacheTest, SizeNeverExceedsCapacity) {
     EXPECT_EQ(cache.size(), 2u);
 }
 
+TEST(LRUCacheTest, AboveCapacityEvictsLeastRecentlyUsed) {
+    LRUCache cache(2);
+    cache.put("a", "1");
+    cache.put("b", "2");
+    cache.put("c", "3");
+
+    EXPECT_FALSE(cache.get("a").has_value());
+    EXPECT_EQ(cache.get("b"), "2");
+    EXPECT_EQ(cache.get("c"), "3");
+}
+
+TEST(LRUCacheTest, RecentlyAccessedItemIsNotEvicted) {
+    LRUCache cache(2);
+    cache.put("a", "1");
+    cache.put("b", "2");
+    cache.get("a");
+    cache.put("c", "3");
+
+    EXPECT_EQ(cache.get("a"), "1");
+    EXPECT_FALSE(cache.get("b").has_value());
+    EXPECT_EQ(cache.get("c"), "3");
+}
+
+TEST(LRUCacheTest, UpdatedItemBecomesMostRecentlyUsed) {
+    LRUCache cache(2);
+    cache.put("a", "1");
+    cache.put("b", "2");
+    cache.put("a", "10");
+    cache.put("c", "3");
+
+    EXPECT_EQ(cache.get("a"), "10");
+    EXPECT_FALSE(cache.get("b").has_value());
+    EXPECT_EQ(cache.get("c"), "3");
+}
+
+TEST(LRUCacheTest, CapacityOneKeepsOnlyLatest) {
+    LRUCache cache(1);
+    cache.put("a", "1");
+    cache.put("b", "2");
+
+    EXPECT_EQ(cache.size(), 1u);
+    EXPECT_FALSE(cache.get("a").has_value());
+    EXPECT_EQ(cache.get("b"), "2");
+
+    cache.put("b", "20");
+    EXPECT_EQ(cache.size(), 1u);
+    EXPECT_EQ(cache.get("b"), "20");
+}
+
+TEST(LRUCacheTest, DuplicateKeyUpdateDoesNotEvict) {
+    LRUCache cache(3);
+    cache.put("a", "1");
+    cache.put("b", "2");
+    cache.put("c", "3");
+    cache.put("c", "30");
+    cache.put("c", "300");
+
+    EXPECT_EQ(cache.size(), 3u);
+    EXPECT_EQ(cache.get("a"), "1");
+    EXPECT_EQ(cache.get("b"), "2");
+    EXPECT_EQ(cache.get("c"), "300");
+}
+
+TEST(LRUCacheTest, EvictionOrderFollowsUsage) {
+    LRUCache cache(3);
+    cache.put("a", "1");
+    cache.put("b", "2");
+    cache.put("c", "3");
+    cache.get("a");
+    cache.get("b");
+
+    cache.put("d", "4");
+    EXPECT_FALSE(cache.get("c").has_value());
+
+    cache.put("e", "5");
+    EXPECT_FALSE(cache.get("a").has_value());
+
+    EXPECT_EQ(cache.get("b"), "2");
+    EXPECT_EQ(cache.get("d"), "4");
+    EXPECT_EQ(cache.get("e"), "5");
+}
+
 TEST(LRUCacheTest, UpdateWhenFullStillWorks) {
     LRUCache cache(2);
     cache.put("a", "1");
