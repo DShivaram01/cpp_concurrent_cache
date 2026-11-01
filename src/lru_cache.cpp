@@ -33,8 +33,28 @@ std::optional<std::string> LRUCache::get(const std::string& key) {
     return it->second->second;
 }
 
+bool LRUCache::remove(const std::string& key) {
+    auto it = index_.find(key);
+    if (it == index_.end()) {
+        return false;
+    }
+
+    usageOrder_.erase(it->second);
+    index_.erase(it);
+    return true;
+}
+
+bool LRUCache::contains(const std::string& key) const {
+    return index_.find(key) != index_.end();
+}
+
 std::size_t LRUCache::size() const {
     return usageOrder_.size();
+}
+
+void LRUCache::clear() {
+    usageOrder_.clear();
+    index_.clear();
 }
 
 std::size_t LRUCache::capacity() const {
