@@ -1,5 +1,7 @@
 # C++ Concurrent LRU Cache
 
+[![CI](https://github.com/DShivaram01/cpp_concurrent_cache/actions/workflows/ci.yml/badge.svg)](https://github.com/DShivaram01/cpp_concurrent_cache/actions/workflows/ci.yml)
+
 A small, thread-safe, in-memory key-value cache written in C++20. It has a fixed capacity and evicts the least recently used entry when full. The project comes with unit tests, multithreaded stress tests and a benchmark program.
 
 ## 1. What it does
