@@ -16,6 +16,11 @@ target_include_directories(cache PUBLIC include)
 target_link_libraries(cache PUBLIC Threads::Threads)
 target_compile_options(cache PRIVATE -Wall -Wextra -Wpedantic)
 
+add_executable(cache_benchmark benchmarks/benchmark_cache.cpp)
+target_link_libraries(cache_benchmark PRIVATE cache)
+target_compile_options(cache_benchmark PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_definitions(cache_benchmark PRIVATE CACHE_BUILD_TYPE="${CMAKE_BUILD_TYPE}")
+
 include(FetchContent)
 FetchContent_Declare(
     googletest
