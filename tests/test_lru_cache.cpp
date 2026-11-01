@@ -161,3 +161,147 @@ TEST(LRUCacheTest, EmptyStringKeyAndValue) {
     ASSERT_TRUE(value.has_value());
     EXPECT_EQ(*value, "");
 }
+
+TEST(LRUCacheTest, EmptyCacheOperations) {
+    LRUCache cache(3);
+    EXPECT_FALSE(cache.contains("a"));
+    EXPECT_FALSE(cache.remove("a"));
+    cache.clear();
+    EXPECT_EQ(cache.size(), 0u);
+}
+
+TEST(LRUCacheTest, ContainsReportsPresence) {
+    LRUCache cache(2);
+    cache.put("a", "1");
+
+    EXPECT_TRUE(cache.contains("a"));
+    EXPECT_FALSE(cache.contains("b"));
+}
+
+TEST(LRUCacheTest, ContainsDoesNotChangeUsageOrder) {
+    LRUCache cache(2);
+    cache.put("a", "1");
+    cache.put("b", "2");
+    EXPECT_TRUE(cache.contains("a"));
+    cache.put("c", "3");
+
+    EXPECT_FALSE(cache.contains("a"));
+    EXPECT_TRUE(cache.contains("b"));
+    EXPECT_TRUE(cache.contains("c"));
+}
+
+TEST(LRUCacheTest, RemoveExistingKey) {
+    LRUCache cache(3);
+    cache.put("a", "1");
+    cache.put("b", "2");
+
+    EXPECT_TRUE(cache.remove("a"));
+    EXPECT_FALSE(cache.contains("a"));
+    EXPECT_FALSE(cache.get("a").has_value());
+    EXPECT_EQ(cache.size(), 1u);
+}
+
+TEST(LRUCacheTest, RemoveMissingKeyReturnsFalse) {
+    LRUCache cache(3);
+    cache.put("a", "1");
+
+    EXPECT_FALSE(cache.remove("b"));
+    EXPECT_EQ(cache.size(), 1u);
+}
+
+TEST(LRUCacheTest, RemoveTwiceReturnsFalseSecondTime) {
+    LRUCache cache(3);
+    cache.put("a", "1");
+
+    EXPECT_TRUE(cache.remove("a"));
+    EXPECT_FALSE(cache.remove("a"));
+}
+
+TEST(LRUCacheTest, RemoveFreesSpaceWithoutEviction) {
+    LRUCache cache(2);
+    cache.put("a", "1");
+    cache.put("b", "2");
+    cache.remove("a");
+    cache.put("c", "3");
+
+    EXPECT_EQ(cache.size(), 2u);
+    EXPECT_TRUE(cache.contains("b"));
+    EXPECT_TRUE(cache.contains("c"));
+}
+
+TEST(LRUCacheTest, RemoveLeastRecentlyUsedThenEvictNext) {
+    LRUCache cache(3);
+    cache.put("a", "1");
+    cache.put("b", "2");
+    cache.put("c", "3");
+    cache.remove("a");
+    cache.put("d", "4");
+    cache.put("e", "5");
+
+    EXPECT_FALSE(cache.contains("b"));
+    EXPECT_TRUE(cache.contains("c"));
+    EXPECT_TRUE(cache.contains("d"));
+    EXPECT_TRUE(cache.contains("e"));
+}
+
+TEST(LRUCacheTest, ClearEmptiesCache) {
+    LRUCache cache(3);
+    cache.put("a", "1");
+    cache.put("b", "2");
+    cache.clear();
+
+    EXPECT_EQ(cache.size(), 0u);
+    EXPECT_FALSE(cache.contains("a"));
+    EXPECT_FALSE(cache.get("b").has_value());
+}
+
+TEST(LRUCacheTest, CacheIsUsableAfterClear) {
+    LRUCache cache(2);
+    cache.put("a", "1");
+    cache.clear();
+    cache.put("b", "2");
+    cache.put("c", "3");
+    cache.put("d", "4");
+
+    EXPECT_EQ(cache.size(), 2u);
+    EXPECT_FALSE(cache.contains("b"));
+    EXPECT_EQ(cache.get("d"), "4");
+}
+
+TEST(LRUCacheTest, RepeatedAccessKeepsItemAlive) {
+    LRUCache cache(3);
+    cache.put("hot", "x");
+    for (int i = 0; i < 100; ++i) {
+        cache.put("key" + std::to_string(i), std::to_string(i));
+        EXPECT_EQ(cache.get("hot"), "x");
+    }
+
+    EXPECT_EQ(cache.size(), 3u);
+    EXPECT_TRUE(cache.contains("key99"));
+    EXPECT_TRUE(cache.contains("key98"));
+    EXPECT_FALSE(cache.contains("key97"));
+}
+
+TEST(LRUCacheTest, ManyInsertsKeepOnlyNewestEntries) {
+    const int capacity = 100;
+    const int inserts = 10000;
+    LRUCache cache(capacity);
+
+    for (int i = 0; i < inserts; ++i) {
+        cache.put("key" + std::to_string(i), std::to_string(i));
+    }
+
+    EXPECT_EQ(cache.size(), static_cast<std::size_t>(capacity));
+    for (int i = 0; i < inserts; ++i) {
+        bool shouldExist = i >= inserts - capacity;
+        EXPECT_EQ(cache.contains("key" + std::to_string(i)), shouldExist) << "key" << i;
+    }
+}
+
+TEST(LRUCacheTest, RemoveOnZeroCapacityCache) {
+    LRUCache cache(0);
+    cache.put("a", "1");
+
+    EXPECT_FALSE(cache.contains("a"));
+    EXPECT_FALSE(cache.remove("a"));
+}
