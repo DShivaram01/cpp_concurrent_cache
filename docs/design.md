@@ -54,3 +54,4 @@ Examples of what goes wrong when two threads run at the same time:
 - A `std::latch` holds all threads until they are ready, then releases them together. Wall time is measured from the release until the last thread joins.
 - Each thread writes its latencies into a pre-sized vector, so recording does not allocate. Afterwards all latencies are merged and sorted.
 - p50/p95/p99 use nearest rank: `sorted[ceil(p/100 * n) - 1]`.
+- `scripts/run_benchmark_suite.sh` runs the whole benchmark 5 times with the same settings, pinned with `taskset` on Linux, keeps every run in `results/raw/` and writes the median per configuration to `results/summary.md`. A single run on a busy machine is too noisy to quote.
