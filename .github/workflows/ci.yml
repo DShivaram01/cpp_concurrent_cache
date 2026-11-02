@@ -20,3 +20,6 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+      - name: Stress concurrent tests (200 repeats)
+        run: ./build/concurrent_cache_tests --gtest_repeat=200 --gtest_brief=1
