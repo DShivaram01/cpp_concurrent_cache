@@ -2,7 +2,12 @@
 
 [![CI](https://github.com/DShivaram01/cpp_concurrent_cache/actions/workflows/ci.yml/badge.svg)](https://github.com/DShivaram01/cpp_concurrent_cache/actions/workflows/ci.yml)
 
-A small, thread-safe, in-memory key-value cache written in C++20. It has a fixed capacity and evicts the least recently used entry when full. The project comes with unit tests, multithreaded stress tests and a benchmark program.
+A thread-safe, fixed-capacity LRU cache in C++20, where `get`, `put`, `remove` and eviction are average O(1).
+
+- **Data structure:** a `std::unordered_map` from key to an iterator into a `std::list` kept in usage order. The map finds the entry and the list moves or evicts it, both in O(1).
+- **Concurrency:** one `std::mutex` guards both containers. Before the lock, the concurrent tests crashed with `malloc(): unsorted double linked list corrupted` ([details](#5-thread-safety)). With it, they pass 200 repeated runs, and CI repeats those 200 runs on every push.
+- **Tests:** 33 GoogleTest tests (28 single-threaded, 5 that each run 8 threads), built with CMake and run in GitHub Actions.
+- **Benchmark:** three get/put mixes at 1, 2, 4 and 8 threads with p50/p95/p99 latency, 5 runs per configuration, median reported. [Method and results](#8-benchmark).
 
 ## 1. What it does
 
@@ -78,21 +83,28 @@ cmake --build build -j
 ```bash
 ctest --test-dir build --output-on-failure
 
-# Stress the concurrent tests
+# Stress the concurrent tests (CI runs this too)
 ./build/concurrent_cache_tests --gtest_repeat=200 --gtest_brief=1
 ```
 
 - `cache_tests`: 28 single-threaded tests covering eviction order, capacity 0 and 1, updates, remove, clear and 10,000 inserts.
 - `concurrent_cache_tests`: 5 tests, each running 8 threads: disjoint inserts, eviction under contention, mixed operations, readers alongside a writer on one key, and `clear` during writes.
 
-## 8. Benchmark results
+## 8. Benchmark
 
 ```bash
-./scripts/run_benchmark.sh            # builds Release, runs, saves to results/
+./scripts/run_benchmark_suite.sh      # Release build, 5 runs pinned with taskset, median -> results/summary.md
+./scripts/run_benchmark.sh            # one run, saved to results/
 ./build/cache_benchmark --ops 2000000 --capacity 10000 --keys 20000 --max-threads 8
 ```
 
 Setup: 1,000,000 operations per run, split evenly across threads. Capacity 10,000, 20,000 distinct keys chosen uniformly at random (so about 50% of gets hit), 32-byte values. The cache is filled to capacity before timing starts. Every operation is timed individually with `std::chrono::steady_clock`. Percentiles use the nearest-rank method on the sorted latencies.
+
+The suite runs every configuration 5 times with the same settings, keeps each run in `results/raw/`, and reports the median (not the best run) with the CPU, compiler, flags, pinning and load average in `results/summary.md`. More in [`docs/design.md`](docs/design.md#benchmark-method).
+
+### Preliminary single run
+
+These numbers come from one run on a shared HPC login node with a load average of about 4, so the multithreaded figures are noisy. Treat them as the shape of the curve, not exact throughput.
 
 Machine: AMD EPYC-Milan, 8 hardware threads, GCC 11.5.0, `-O3` (Release). Raw output is in [`results/benchmark_20261101_143351.txt`](results/benchmark_20261101_143351.txt).
 
@@ -129,7 +141,6 @@ What the numbers show:
 - **Read-heavy suffers least, but not by much.** `put` does a bit more work than `get` (it may allocate a node and evict one), so its critical section is longer. Even so, read-heavy workloads still serialise, because `get` also writes to the list.
 
 Caveats:
-- These runs were on a shared HPC login node with a load average of about 4 during the run, so the multithreaded numbers are noisy. Rerun on an idle machine before quoting exact figures.
 - The per-operation timer adds its own overhead, roughly a few tens of nanoseconds, which inflates the single-thread latencies a little.
 - Workloads are uniform-random. Real access patterns are usually skewed toward a few popular keys, which changes the hit rate.
 
