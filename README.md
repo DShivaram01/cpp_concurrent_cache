@@ -66,7 +66,7 @@ The concurrent tests check that the final state is consistent: `size() <= capaci
 
 ## 6. Build
 
-Requires CMake 3.20+ and a C++20 compiler (tested with GCC 11.5). GoogleTest is downloaded automatically by CMake's FetchContent.
+Requires CMake 3.20+ and a C++20 compiler (tested with GCC 11.5 and 13.3). GoogleTest is downloaded automatically by CMake's FetchContent.
 
 ```bash
 cmake -S . -B build
@@ -88,54 +88,61 @@ ctest --test-dir build --output-on-failure
 ## 8. Benchmark results
 
 ```bash
-./scripts/run_benchmark.sh            # builds Release, runs, saves to results/
-./build/cache_benchmark --ops 2000000 --capacity 10000 --keys 20000 --max-threads 8
+./scripts/run_benchmark.sh --ops 4000000 --max-threads 32   # builds Release, runs, saves to results/
 ```
 
-Setup: 1,000,000 operations per run, split evenly across threads. Capacity 10,000, 20,000 distinct keys chosen uniformly at random (so about 50% of gets hit), 32-byte values. The cache is filled to capacity before timing starts. Every operation is timed individually with `std::chrono::steady_clock`. Percentiles use the nearest-rank method on the sorted latencies.
+Setup: 4,000,000 operations per run, split evenly across threads. Capacity 10,000, 20,000 distinct keys chosen uniformly at random (so about 50% of gets hit), 32-byte values. The cache is filled to capacity before timing starts. Every operation is timed individually with `std::chrono::steady_clock`. Percentiles use the nearest-rank method on the sorted latencies.
 
-Machine: AMD EPYC-Milan, 8 hardware threads, GCC 11.5.0, `-O3` (Release). Raw output is in [`results/benchmark_20261101_143351.txt`](results/benchmark_20261101_143351.txt).
+Machine: AMD Ryzen 9 9950X (16 cores / 32 threads, two 8-core CCDs), Ubuntu, GCC 13.3.0, `-O3` (Release), default CPU frequency governor. Load average was about 0.3 with no other users logged in. I ran the benchmark three times back to back. The tables show the median of the three runs for each row. Raw output: [`run 1`](results/benchmark_20261104_175247.txt), [`run 2`](results/benchmark_20261104_175317.txt), [`run 3`](results/benchmark_20261104_175349.txt).
 
 **Read-heavy (80% get / 20% put)**
 
 | Threads | ops/sec | avg (ns) | p50 (ns) | p95 (ns) | p99 (ns) |
 |---:|---:|---:|---:|---:|---:|
-| 1 | 4,894,059 | 171 | 149 | 290 | 510 |
-| 2 | 1,605,573 | 1,203 | 380 | 4,400 | 20,421 |
-| 4 | 897,251 | 4,372 | 820 | 18,762 | 36,210 |
-| 8 | 844,362 | 9,270 | 3,209 | 37,051 | 74,121 |
+| 1 | 8,978,083 | 92 | 90 | 160 | 210 |
+| 2 | 4,997,949 | 380 | 150 | 1,730 | 3,360 |
+| 4 | 4,836,343 | 803 | 280 | 3,100 | 5,720 |
+| 8 | 4,074,591 | 1,931 | 950 | 6,430 | 10,830 |
+| 16 | 2,144,657 | 7,422 | 5,750 | 20,520 | 31,060 |
+| 32 | 1,987,396 | 16,042 | 13,400 | 43,650 | 68,500 |
 
 **Balanced (50% get / 50% put)**
 
 | Threads | ops/sec | avg (ns) | p50 (ns) | p95 (ns) | p99 (ns) |
 |---:|---:|---:|---:|---:|---:|
-| 1 | 4,570,787 | 186 | 160 | 291 | 390 |
-| 2 | 1,442,379 | 1,327 | 280 | 3,780 | 23,291 |
-| 4 | 652,937 | 5,837 | 980 | 26,251 | 64,800 |
-| 8 | 579,992 | 13,428 | 4,849 | 51,370 | 104,951 |
+| 1 | 9,415,095 | 90 | 80 | 150 | 180 |
+| 2 | 4,594,810 | 414 | 140 | 1,820 | 3,690 |
+| 4 | 4,168,236 | 936 | 360 | 3,650 | 6,460 |
+| 8 | 3,393,261 | 2,315 | 1,060 | 7,910 | 13,110 |
+| 16 | 1,964,151 | 8,104 | 5,260 | 23,910 | 36,170 |
+| 32 | 1,690,581 | 18,866 | 14,780 | 50,950 | 78,220 |
 
 **Write-heavy (20% get / 80% put)**
 
 | Threads | ops/sec | avg (ns) | p50 (ns) | p95 (ns) | p99 (ns) |
 |---:|---:|---:|---:|---:|---:|
-| 1 | 4,515,588 | 190 | 169 | 291 | 380 |
-| 2 | 1,106,064 | 1,767 | 591 | 4,940 | 29,600 |
-| 4 | 590,739 | 6,600 | 1,260 | 29,091 | 60,210 |
-| 8 | 513,751 | 15,307 | 5,131 | 58,860 | 112,662 |
+| 1 | 8,907,234 | 96 | 90 | 150 | 180 |
+| 2 | 3,758,910 | 510 | 160 | 2,090 | 4,830 |
+| 4 | 3,646,455 | 1,070 | 470 | 4,140 | 7,460 |
+| 8 | 2,943,807 | 2,677 | 1,040 | 9,520 | 16,420 |
+| 16 | 2,513,764 | 6,331 | 1,950 | 23,950 | 42,320 |
+| 32 | 1,273,463 | 25,038 | 9,850 | 90,060 | 147,231 |
 
 What the numbers show:
-- **More threads made it slower.** Total throughput dropped from about 4.5–4.9M ops/s on one thread to about 0.5–0.8M ops/s on eight. Every operation, `get` included, takes the same lock, so threads mostly wait on each other. Contention also moves the mutex's cache line between cores and puts threads to sleep and wakes them in the kernel, which costs more than the cache work itself.
-- **Tail latency grows much faster than the median.** At 8 threads the p50 is a few microseconds, but the p99 is 74–113 µs. Those slow operations are the ones that waited behind several others for the lock.
-- **Read-heavy suffers least, but not by much.** `put` does a bit more work than `get` (it may allocate a node and evict one), so its critical section is longer. Even so, read-heavy workloads still serialise, because `get` also writes to the list.
+- **More threads made it slower.** One thread does about 9M ops/s. At 32 threads total throughput is 1.3–2.0M ops/s, so the whole machine gets 14–22% of what a single thread gets alone. Every operation, `get` included, takes the same lock, so only one thread does useful work at a time. Handing the lock over costs more than the work itself, which is about 90 ns: the mutex's cache line has to move to another core, and threads that lose the race sleep and wake through the kernel.
+- **Most of the time is spent waiting.** At 32 threads the median operation takes 10–15 µs. The cache work inside it is still under 100 ns.
+- **The tail grows much faster than the median.** p99 goes from about 200 ns on one thread to 69 µs (read-heavy) and 147 µs (write-heavy) at 32 threads. Those are the operations that queued behind many others.
+- **Writes hurt more than reads, but reads still serialise.** `put` may allocate a node and evict one, so it holds the lock longer. `get` also moves its entry to the front of the list, so it needs the same exclusive lock and can't run in parallel either.
 
 Caveats:
-- These runs were on a shared HPC login node with a load average of about 4 during the run, so the multithreaded numbers are noisy. Rerun on an idle machine before quoting exact figures.
-- The per-operation timer adds its own overhead, roughly a few tens of nanoseconds, which inflates the single-thread latencies a little.
-- Workloads are uniform-random. Real access patterns are usually skewed toward a few popular keys, which changes the hit rate.
+- The 1-, 16- and 32-thread rows are steady, within about 5% across runs (write-heavy at 16 threads is the exception). The 2–16 thread rows moved by 20–50% between runs. Write-heavy at 16 threads ranged from 1.76M to 3.03M ops/s. On this CPU it matters whether the contending threads land on one CCD or are split across both, and the threads were not pinned. Treat the mid-range rows as approximate.
+- I didn't have root access, so the frequency governor was left at its default.
+- The per-operation timer adds some overhead of its own, a few tens of nanoseconds, which inflates the single-thread latencies a little.
+- Workloads are uniform-random. Real access patterns usually favour a few popular keys, which changes the hit rate and concentrates contention.
 
 ## 9. Limitations
 
-- One global lock: correct, but it does not scale with threads. Splitting the cache into several independently locked shards is the usual next step.
+- One global lock: correct, but throughput drops as threads are added (see section 8). Splitting the cache into several independently locked shards is the usual next step.
 - Keys and values are fixed to `std::string`. The class is not a template.
 - No TTL or expiration yet.
 - `get` returns a copy of the value, so very large values are expensive to read.
